@@ -597,6 +597,15 @@ retry:
                      }
                   }
 
+                  /* pgagroal_append() returns its input on allocation
+                     failure, so l is still NULL if the first append failed. */
+                  if (l == NULL)
+                  {
+                     free(n);
+                     n = NULL;
+                     break;
+                  }
+
                   if (strlen(l) == LINE_LENGTH * 2)
                   {
                      full_line = true;
@@ -605,8 +614,8 @@ retry:
                   {
                      if (strlen(l) < LINE_LENGTH * 2)
                      {
-                        int chars_missing = (LINE_LENGTH * 2) - strlen(l);
-                        for (int i = 0; i < chars_missing; i++)
+                        size_t chars_missing = (LINE_LENGTH * 2) - strlen(l);
+                        for (size_t i = 0; i < chars_missing; i++)
                         {
                            l = pgagroal_append_char(l, ' ');
                         }
