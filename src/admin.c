@@ -1560,12 +1560,15 @@ create_response(char* users_path, struct json* json, struct json** response)
    while (fgets(line, sizeof(line), users_file))
    {
       ptr = strtok(line, ":");
-      if (strchr(ptr, '\n'))
+      if (ptr == NULL || strchr(ptr, '\n'))
       {
          continue;
       }
       pgagroal_json_append(users, (uintptr_t)ptr, ValueString);
    }
+
+   fclose(users_file);
+   users_file = NULL;
 
    pgagroal_json_put(r, "Users", (uintptr_t)users, ValueJSON);
 
@@ -1575,7 +1578,15 @@ create_response(char* users_path, struct json* json, struct json** response)
 
 error:
 
-   pgagroal_json_destroy(r);
+   if (users_file != NULL)
+   {
+      fclose(users_file);
+   }
+
+   pgagroal_json_destroy(users);
+
+   /* r is not destroyed here: pgagroal_json_put() above hands it to json
+      with ValueJSON, so json owns it and frees it with its own tree. */
 
    return 1;
 }
