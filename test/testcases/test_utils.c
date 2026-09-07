@@ -30,6 +30,7 @@
 #include <mctf.h>
 #include <utils.h>
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -103,5 +104,45 @@ MCTF_TEST(test_utils_compare_string)
                "different strings should not compare equal");
 
 cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_append_numbers)
+{
+   char* s = NULL;
+
+   /* The largest value of each type is the corner case: it needs every digit
+      the buffer can hold, so a size argument that is one short truncates it
+      silently rather than overflowing. */
+   s = pgagroal_append_int(NULL, INT_MIN);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_int returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "-2147483648", cleanup, "append_int truncated INT_MIN");
+   free(s);
+   s = NULL;
+
+   s = pgagroal_append_int(NULL, INT_MAX);
+   MCTF_ASSERT_STR_EQ(s, "2147483647", cleanup, "append_int wrong for INT_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgagroal_append_ulong(NULL, ULONG_MAX);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_ulong returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "18446744073709551615", cleanup, "append_ulong truncated ULONG_MAX");
+   free(s);
+   s = NULL;
+
+   s = pgagroal_append_ullong(NULL, ULLONG_MAX);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "append_ullong returned NULL");
+   MCTF_ASSERT_STR_EQ(s, "18446744073709551615", cleanup, "append_ullong truncated ULLONG_MAX");
+   free(s);
+   s = NULL;
+
+   /* Appending onto an existing string must concatenate, not replace */
+   s = pgagroal_append(NULL, "n=");
+   s = pgagroal_append_ulong(s, ULONG_MAX);
+   MCTF_ASSERT_STR_EQ(s, "n=18446744073709551615", cleanup, "append_ulong did not concatenate");
+
+cleanup:
+   free(s);
    MCTF_FINISH();
 }
