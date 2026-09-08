@@ -55,7 +55,6 @@
 #include <openssl/ssl.h>
 
 #define HELP                   99
-#define DB_ALIAS_STRING_LENGTH 512
 
 #define COMMAND_CANCELSHUTDOWN "cancel-shutdown"
 #define COMMAND_CLEAR          "clear"
@@ -1965,8 +1964,9 @@ process_alias_result(SSL* ssl, int socket, int32_t output_format)
          }
 
          // Build the database=aliases string
-         char db_alias_string[DB_ALIAS_STRING_LENGTH];
-         pgagroal_snprintf(db_alias_string, sizeof(db_alias_string), "%s", database);
+         char* db_alias_string = NULL;
+
+         db_alias_string = pgagroal_append(db_alias_string, database);
 
          struct json* alias_list = (struct json*)pgagroal_json_get(entry, CONFIGURATION_ARGUMENT_LIMIT_ALIASES);
 
@@ -1979,7 +1979,7 @@ process_alias_result(SSL* ssl, int socket, int32_t output_format)
                {
                   if (first)
                   {
-                     strcat(db_alias_string, "=");
+                     db_alias_string = pgagroal_append_char(db_alias_string, '=');
                   }
 
                   // Aliases are simple strings
@@ -1989,15 +1989,16 @@ process_alias_result(SSL* ssl, int socket, int32_t output_format)
                   {
                      pgagroal_log_debug("Error: Corrupted alias data - missing alias field");
                      pgagroal_json_iterator_destroy(alias_iter);
+                     free(db_alias_string);
                      result = 1;
                      goto cleanup;
                   }
 
                   if (!first)
                   {
-                     strcat(db_alias_string, ",");
+                     db_alias_string = pgagroal_append_char(db_alias_string, ',');
                   }
-                  strcat(db_alias_string, alias);
+                  db_alias_string = pgagroal_append(db_alias_string, alias);
                   first = false;
                }
                pgagroal_json_iterator_destroy(alias_iter);
@@ -2017,6 +2018,9 @@ process_alias_result(SSL* ssl, int socket, int32_t output_format)
             // If no limit data, just show database=aliases and username
             printf("%-40s %-10s\n", db_alias_string, username);
          }
+
+         free(db_alias_string);
+         db_alias_string = NULL;
       }
    }
    else
