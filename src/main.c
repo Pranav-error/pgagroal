@@ -2422,7 +2422,8 @@ accept_transfer_cb(struct io_watcher* watcher)
    {
       pgagroal_log_trace("pgagroal: Transfer kill connection");
 
-      if (pgagroal_connection_transfer_read(client_fd, &slot, &fd))
+      if (pgagroal_connection_slot_read(client_fd, &slot) ||
+          pgagroal_connection_socket_read(client_fd, &fd))
       {
          pgagroal_log_error("pgagroal: Transfer kill connection: Slot %d FD %d", slot, fd);
          goto error;
@@ -2430,29 +2431,27 @@ accept_transfer_cb(struct io_watcher* watcher)
 
       if (known_fds[slot] == fd)
       {
-         struct client* c = clients;
-         while (c != NULL)
+         /* Only transaction workers were given the slot's socket (CONNECTION_CLIENT_FD) */
+         if (config->pipeline == PIPELINE_TRANSACTION)
          {
-            int c_fd = -1;
-
-            if (pgagroal_connection_get_pid(c->pid, &c_fd))
+            struct client* c = clients;
+            while (c != NULL)
             {
-               goto error;
+               int c_fd = -1;
+
+               /* Best effort: a client that isn't listening must not keep us from closing the socket */
+               if (!pgagroal_connection_get_pid(c->pid, &c_fd))
+               {
+                  if (!pgagroal_connection_id_write(c_fd, CONNECTION_REMOVE_FD))
+                  {
+                     pgagroal_connection_transfer_write(c_fd, slot);
+                  }
+
+                  pgagroal_disconnect(c_fd);
+               }
+
+               c = c->next;
             }
-
-            if (pgagroal_connection_id_write(c_fd, CONNECTION_REMOVE_FD))
-            {
-               goto error;
-            }
-
-            if (pgagroal_connection_transfer_write(c_fd, slot))
-            {
-               goto error;
-            }
-
-            pgagroal_disconnect(c_fd);
-
-            c = c->next;
          }
 
          pgagroal_disconnect(fd);
